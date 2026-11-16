@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireGuard Pro | Controle de Extintores e Hidrantes</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- QRCode.js (100% client-side) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar & smooth transitions */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .fade-in {
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Estilos otimizados para impressão de etiquetas QR Code */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 12mm;
+                background: white !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .qr-label-card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                border: 2px solid #0f172a !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Área oculta exclusiva para renderização de impressão limpa -->
+    <div id="print-area" class="hidden print:block"></div>
+
+    <!-- Notificações Toast (Sem alert nativo) -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0 no-print"></div>
+
+    <!-- ===================================================================== -->
+    <!-- TELA DEDICADA: LEITURA VIA QR CODE (FICHA PÚBLICA / INSPEÇÃO RÁPIDA)  -->
+    <!-- ===================================================================== -->
+    <div id="qr-scanner-view" class="hidden min-h-screen bg-slate-100 flex-col no-print">
+        <!-- Barra Superior Mobile-First -->
+        <div class="bg-slate-900 text-white px-4 py-3.5 sticky top-0 z-30 shadow-md border-b border-slate-800">
+            <div class="max-w-2xl mx-auto flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center shadow-sm">
+                        <i class="fa-solid fa-qrcode text-white text-base"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] uppercase tracking-wider text-brand-400 font-bold block leading-none">Inspeção via QR Code</span>
+                        <h1 class="text-sm sm:text-base font-bold text-white leading-tight mt-0.5">FireGuard <span class="text-brand-500">Pro</span></h1>
+                    </div>
+                </div>
+                <button onclick="exitQrView()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Voltar ao Painel Geral</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Conteúdo da Ficha do Equipamento Escaneado -->
+        <div id="qr-scanner-content" class="max-w-2xl w-full mx-auto px-4 py-6 space-y-5 flex-1">
+            <!-- Preenchido dinamicamente via JS -->
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- APLICAÇÃO PRINCIPAL (PAINEL GERENCIAL)                                -->
+    <!-- ===================================================================== -->
+    <div id="main-app-wrapper" class="flex-1 flex flex-col no-print">
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap items-center justify-between py-3.5 gap-3">
+                <!-- Logo & Título -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center shadow-md shadow-brand-900/50 border border-brand-500/30">
+                        <i class="fa-solid fa-fire-extinguisher text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">FireGuard <span class="text-brand-500">Pro</span></h1>
+                            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">NBR 12962 / 13714</span>
+                        </div>
+                        <p class="text-xs text-slate-400">Gestão de Vencimentos, Inspeções e Trocas</p>
+                    </div>
+                </div>
+
+                <!-- Ações Rápidas Header -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="printAllQrLabels()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition flex items-center gap-2 border border-slate-700" title="Gerar folha para impressão de todas as etiquetas QR">
+                        <i class="fa-solid fa-qrcode text-brand-400"></i>
+                        <span class="hidden lg:inline">Imprimir Etiquetas QR</span>
+                    </button>
+
+                    <div class="relative" id="export-dropdown-wrapper">
+                        <button onclick="toggleExportMenu()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition flex items-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-download text-slate-400"></i>
+                            <span class="hidden md:inline">Relatórios & Backup</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                        </button>
+                        <div id="export-menu" class="hidden absolute right-0 mt-2 w-60 rounded-xl bg-white shadow-xl border border-slate-200 py-1.5 z-40 text-slate-700 text-sm">
+                            <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Exportar Planilhas (CSV)</div>
+                            <button onclick="exportEquipmentsCSV(); toggleExportMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 transition">
+                                <i class="fa-solid fa-file-csv text-emerald-600 w-4"></i>
+                                <span>Lista de Equipamentos</span>
+                            </button>
+                            <button onclick="exportHistoryCSV(); toggleExportMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 transition">
+                                <i class="fa-solid fa-clock-rotate-left text-blue-600 w-4"></i>
+                                <span>Histórico de Checagens/Trocas</span>
+                            </button>
+                            <div class="my-1 border-t border-slate-100"></div>
+                            <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Dados do Sistema (JSON)</div>
+                            <button onclick="exportBackupJSON(); toggleExportMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 transition">
+                                <i class="fa-solid fa-database text-slate-600 w-4"></i>
+                                <span>Baixar Backup Completo</span>
+                            </button>
+                            <label class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2.5 transition cursor-pointer">
+                                <i class="fa-solid fa-upload text-amber-600 w-4"></i>
+                                <span>Restaurar Backup JSON</span>
+                                <input type="file" id="json-import-input" accept=".json" class="hidden" onchange="importBackupJSON(event)">
+                            </label>
+                            <div class="my-1 border-t border-slate-100"></div>
+                            <button onclick="confirmResetDemoData(); toggleExportMenu();" class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-2.5 transition text-xs">
+                                <i class="fa-solid fa-rotate w-4"></i>
+                                <span>Restaurar Dados de Demonstração</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button onclick="openEquipmentModal()" class="px-3.5 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs sm:text-sm font-semibold shadow-sm shadow-brand-600/30 transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Novo Equipamento</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Dashboard Cards -->
+        <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" id="kpi-container">
+            <!-- Preenchido dinamicamente via JS -->
+        </section>
+
+        <!-- Navegação por Abas -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="border-b border-slate-200 px-4 sm:px-6 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+                <nav class="flex gap-1 sm:gap-2 -mb-px" aria-label="Tabs">
+                    <button id="tab-btn-equipments" onclick="switchTab('equipments')" class="tab-btn active-tab py-3.5 px-3 sm:px-4 text-sm font-semibold border-b-2 border-brand-600 text-brand-700 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Equipamentos</span>
+                        <span id="badge-count-equipments" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-brand-100 text-brand-700 font-bold">0</span>
+                    </button>
+                    <button id="tab-btn-history" onclick="switchTab('history')" class="tab-btn py-3.5 px-3 sm:px-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Histórico de Checagens & Trocas</span>
+                        <span id="badge-count-history" class="ml-1 px-2 py-0.5 text-xs rounded-full bg-slate-200 text-slate-700 font-bold">0</span>
+                    </button>
+                </nav>
+
+                <!-- Data de referência -->
+                <div class="py-2 text-xs text-slate-500 flex items-center gap-1.5">
+                    <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                    <span>Referência: <strong id="current-date-label" class="text-slate-700"></strong></span>
+                </div>
+            </div>
+
+            <!-- ABA 1: EQUIPAMENTOS -->
+            <div id="view-equipments" class="p-4 sm:p-6 space-y-5 fade-in">
+                <!-- Barra de Busca e Filtros -->
+                <div class="flex flex-col lg:flex-row gap-3 justify-between">
+                    <!-- Busca -->
+                    <div class="relative flex-1 max-w-md">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="search-equipment" oninput="renderEquipments()" placeholder="Buscar por código (EXT-001), setor, tipo..." class="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600 transition bg-white">
+                        <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- Filtros de Categoria e Status -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Filtro Tipo -->
+                        <select id="filter-category" onchange="renderEquipments()" class="px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                            <option value="ALL">Todos os Tipos</option>
+                            <option value="Extintor">🧯 Apenas Extintores</option>
+                            <option value="Hidrante">🚰 Apenas Hidrantes</option>
+                        </select>
+
+                        <!-- Filtro Status Pills -->
+                        <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/80 overflow-x-auto max-w-full">
+                            <button onclick="setStatusFilter('ALL')" data-status="ALL" class="status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-white text-slate-900 shadow-sm">Todos</button>
+                            <button onclick="setStatusFilter('EXPIRED')" data-status="EXPIRED" class="status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-red-700">Vencidos</button>
+                            <button onclick="setStatusFilter('WARNING')" data-status="WARNING" class="status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-amber-700">Próx. Vencimento</button>
+                            <button onclick="setStatusFilter('VALID')" data-status="VALID" class="status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-emerald-700">Em Dia</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela Responsiva / Cards Mobile -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <th class="py-3.5 px-4">Código / Equipamento</th>
+                                <th class="py-3.5 px-4">Localização / Setor</th>
+                                <th class="py-3.5 px-4">Última Manutenção</th>
+                                <th class="py-3.5 px-4">Vencimento Recarga/Teste</th>
+                                <th class="py-3.5 px-4">Próx. Checagem</th>
+                                <th class="py-3.5 px-4">Status</th>
+                                <th class="py-3.5 px-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="equipments-table-body" class="divide-y divide-slate-200 text-sm bg-white">
+                            <!-- Linhas geradas via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Estado Vazio Equipamentos -->
+                <div id="empty-equipments" class="hidden py-12 text-center">
+                    <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                        <i class="fa-solid fa-fire-extinguisher"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-800">Nenhum equipamento encontrado</h3>
+                    <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">Tente ajustar os filtros de busca ou cadastre um novo extintor ou hidrante no sistema.</p>
+                    <button onclick="openEquipmentModal()" class="mt-4 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition">
+                        <i class="fa-solid fa-plus mr-1.5"></i> Cadastrar Equipamento
+                    </button>
+                </div>
+            </div>
+
+            <!-- ABA 2: HISTÓRICO GERAL DE CHECAGENS E TROCAS -->
+            <div id="view-history" class="hidden p-4 sm:p-6 space-y-5 fade-in">
+                <!-- Filtros do Histórico -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Equipamento</label>
+                        <select id="hist-filter-equipment" onchange="renderGlobalHistory()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                            <option value="ALL">Todos os Equipamentos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Evento</label>
+                        <select id="hist-filter-type" onchange="renderGlobalHistory()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                            <option value="ALL">Todos os Eventos</option>
+                            <option value="Checagem Periódica">Checagem Periódica (Inspeção)</option>
+                            <option value="Recarga">Recarga</option>
+                            <option value="Troca / Substituição">Troca / Substituição</option>
+                            <option value="Teste Hidrostático">Teste Hidrostático</option>
+                            <option value="Manutenção Corretiva">Manutenção Corretiva</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Data Inicial</label>
+                        <input type="date" id="hist-filter-start" onchange="renderGlobalHistory()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Data Final</label>
+                        <div class="flex gap-2">
+                            <input type="date" id="hist-filter-end" onchange="renderGlobalHistory()" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                            <button onclick="resetHistoryFilters()" title="Limpar filtros" class="px-3 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm transition">
+                                <i class="fa-solid fa-eraser"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista / Timeline do Histórico Geral -->
+                <div id="global-history-list" class="space-y-3">
+                    <!-- Itens gerados via JS -->
+                </div>
+
+                <div id="empty-history" class="hidden py-12 text-center">
+                    <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-800">Nenhum registro encontrado</h3>
+                    <p class="text-sm text-slate-500 mt-1">Não há checagens ou trocas correspondentes aos filtros selecionados.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <p><strong>FireGuard Pro</strong> — Sistema de Controle Preventivo de Combate a Incêndio.</p>
+            <p>Armazenamento local ativo • QR Codes e Exportação CSV/JSON disponíveis.</p>
+        </div>
+    </footer>
+    </div> <!-- Fim #main-app-wrapper -->
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: CADASTRO / EDIÇÃO DE EQUIPAMENTO                             -->
+    <!-- ===================================================================== -->
+    <div id="modal-equipment" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden fade-in">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-fire-extinguisher text-brand-500"></i>
+                    <h2 id="modal-equipment-title" class="text-base sm:text-lg font-bold">Novo Equipamento</h2>
+                </div>
+                <button onclick="closeModal('modal-equipment')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-equipment" onsubmit="saveEquipment(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+                <input type="hidden" id="eq-id">
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Código / Patrimônio *</label>
+                        <input type="text" id="eq-code" required placeholder="Ex: EXT-001" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold uppercase focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Categoria / Tipo *</label>
+                        <select id="eq-type" onchange="updateSubtypeSuggestions()" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                            <option value="Extintor">Extintor de Incêndio</option>
+                            <option value="Hidrante">Hidrante / Sistema Hidráulico</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Capacidade / Especif. *</label>
+                        <input type="text" id="eq-capacity" required placeholder="Ex: 6 kg ou Mangueira 30m" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Subtipo / Classe Extintora *</label>
+                        <input type="text" id="eq-subtype" list="subtype-options" required placeholder="Ex: Pó Químico ABC" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                        <datalist id="subtype-options">
+                            <option value="Pó Químico ABC">
+                            <option value="Pó Químico BC">
+                            <option value="Água Pressurizada (AP)">
+                            <option value="Gás Carbônico (CO2)">
+                            <option value="Espuma Mecânica">
+                            <option value="Hidrante de Parede (Abrigo)">
+                            <option value="Hidrante de Coluna">
+                            <option value="Hidrante de Recalque">
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Localização / Setor *</label>
+                        <input type="text" id="eq-location" required placeholder="Ex: Recepção Principal - Pilar 02" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Última Recarga / Manut. *</label>
+                        <input type="date" id="eq-last-maintenance" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Vencimento (Recarga/Teste) *</label>
+                        <input type="date" id="eq-expiry-date" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Próxima Checagem Mensal *</label>
+                        <input type="date" id="eq-next-check" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Observações / Nº Selo Inmetro</label>
+                    <textarea id="eq-notes" rows="2" placeholder="Informações adicionais, número do selo Inmetro, fabricante, detalhes de instalação..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeModal('modal-equipment')" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Salvar Equipamento</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: REGISTRAR CHECAGEM / TROCA / RECARGA                         -->
+    <!-- ===================================================================== -->
+    <div id="modal-event" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden fade-in">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <span class="text-[11px] uppercase tracking-wider text-brand-400 font-bold">Novo Registro Operacional</span>
+                    <h2 id="modal-event-title" class="text-base sm:text-lg font-bold">Registrar Checagem / Troca</h2>
+                </div>
+                <button onclick="closeModal('modal-event')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-event" onsubmit="saveEventRecord(event)" class="p-6 space-y-4 max-h-[84vh] overflow-y-auto">
+                <input type="hidden" id="ev-equipment-id">
+
+                <!-- Resumo do equipamento alvo -->
+                <div id="ev-equipment-banner" class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                    <!-- Preenchido via JS -->
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Evento *</label>
+                        <select id="ev-type" onchange="handleEventTypeChange()" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                            <option value="Checagem Periódica">📋 Checagem Periódica (Inspeção Visual)</option>
+                            <option value="Recarga">🔄 Recarga Completa</option>
+                            <option value="Troca / Substituição">🔁 Troca / Substituição de Equipamento</option>
+                            <option value="Teste Hidrostático">🧪 Teste Hidrostático (5 anos)</option>
+                            <option value="Manutenção Corretiva">🛠️ Manutenção Corretiva / Reparo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Data do Evento *</label>
+                        <input type="date" id="ev-date" onchange="handleEventTypeChange()" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-600">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Responsável Técnico / Inspetor *</label>
+                    <input type="text" id="ev-inspector" required placeholder="Ex: Carlos Mendes (Técnico Seg. Trabalho) ou Empresa ExtinSeg" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600">
+                </div>
+
+                <!-- Checklist Técnico -->
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/90 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Checklist de Conformidade</span>
+                        <button type="button" onclick="checkAllChecklist(true)" class="text-[11px] font-semibold text-brand-600 hover:underline">Marcar todos OK</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <label class="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:border-slate-300">
+                            <input type="checkbox" id="chk-seal" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500">
+                            <span class="font-medium text-slate-700">Lacre e pino intactos</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:border-slate-300">
+                            <input type="checkbox" id="chk-gauge" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500">
+                            <span class="font-medium text-slate-700">Manômetro faixa verde / Pressão OK</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:border-slate-300">
+                            <input type="checkbox" id="chk-access" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500">
+                            <span class="font-medium text-slate-700">Sinalização e acesso livre</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:border-slate-300">
+                            <input type="checkbox" id="chk-hose" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500">
+                            <span class="font-medium text-slate-700">Mangueira, bico e cilindro íntegros</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Atualização Automática de Datas -->
+                <div class="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200/80 space-y-3">
+                    <div class="flex items-center gap-2 text-xs font-bold text-blue-900">
+                        <i class="fa-solid fa-calendar-plus text-blue-600"></i>
+                        <span>Atualização Automática de Datas do Equipamento</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-blue-900 mb-1">Nova Data de Vencimento (Recarga/Teste)</label>
+                            <input type="date" id="ev-new-expiry" class="w-full px-3 py-2 rounded-lg border border-blue-200 text-sm bg-white focus:outline-none focus:border-blue-600">
+                            <p id="ev-expiry-hint" class="text-[10px] text-blue-700 mt-1">Preenchido automaticamente em Recargas/Trocas (+1 ano).</p>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-blue-900 mb-1">Próxima Checagem Mensal</label>
+                            <input type="date" id="ev-new-next-check" required class="w-full px-3 py-2 rounded-lg border border-blue-200 text-sm bg-white focus:outline-none focus:border-blue-600">
+                            <p class="text-[10px] text-blue-700 mt-1">Sugerido +30 dias a partir do evento.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Observações Detalhadas</label>
+                    <textarea id="ev-notes" rows="2" placeholder="Descreva o que foi verificado, nº do novo selo, motivo da troca ou não conformidades encontradas..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-600"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeModal('modal-event')" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Confirmar Registro</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: DETALHES DO EQUIPAMENTO & TIMELINE INDIVIDUAL DE HISTÓRICO   -->
+    <!-- ===================================================================== -->
+    <div id="modal-details" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden fade-in flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div id="det-icon-box" class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white text-lg">
+                        <i class="fa-solid fa-fire-extinguisher"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 id="det-code" class="text-lg font-bold tracking-tight">EXT-001</h2>
+                            <span id="det-status-badge"></span>
+                        </div>
+                        <p id="det-subtitle" class="text-xs text-slate-300">Pó Químico ABC • 6 kg</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-details')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Corpo Rolável -->
+            <div class="p-6 overflow-y-auto space-y-6 flex-1">
+                <!-- Ficha Técnica Resumida -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                        <span class="block text-[11px] font-semibold uppercase text-slate-400">Setor / Local</span>
+                        <span id="det-location" class="text-sm font-semibold text-slate-800 mt-0.5 block">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[11px] font-semibold uppercase text-slate-400">Última Manutenção</span>
+                        <span id="det-last-maint" class="text-sm font-semibold text-slate-800 mt-0.5 block">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[11px] font-semibold uppercase text-slate-400">Vencimento</span>
+                        <span id="det-expiry" class="text-sm font-bold text-slate-800 mt-0.5 block">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[11px] font-semibold uppercase text-slate-400">Próx. Checagem</span>
+                        <span id="det-next-check" class="text-sm font-semibold text-slate-800 mt-0.5 block">-</span>
+                    </div>
+                    <div class="col-span-2 sm:col-span-4 pt-2 border-t border-slate-200/80">
+                        <span class="block text-[11px] font-semibold uppercase text-slate-400">Observações Cadastrais</span>
+                        <p id="det-notes" class="text-xs text-slate-600 mt-0.5">-</p>
+                    </div>
+                </div>
+
+                <!-- Barra de Ação Rápida dentro dos Detalhes -->
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-timeline text-brand-600"></i>
+                        <span>Histórico Cronológico de Checagens e Trocas</span>
+                        <span id="det-history-count" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">0</span>
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="det-btn-qrcode" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-qrcode text-brand-400"></i> QR Code
+                        </button>
+                        <button id="det-btn-edit" class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-pen"></i> Editar Cadastro
+                        </button>
+                        <button id="det-btn-new-event" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-clipboard-check"></i> Registrar Checagem / Troca
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Timeline Vertical -->
+                <div id="det-timeline" class="relative pl-6 border-l-2 border-slate-200 space-y-5 ml-2">
+                    <!-- Itens gerados via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: CONFIRMAÇÃO PERSONALIZADA (SEM window.confirm)               -->
+    <!-- ===================================================================== -->
+    <div id="modal-confirm" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 fade-in">
+            <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 text-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 id="confirm-title" class="text-base font-bold text-slate-900">Confirmar Exclusão</h3>
+                    <p id="confirm-message" class="text-sm text-slate-600 mt-1">Tem certeza que deseja realizar esta ação?</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2.5 mt-6">
+                <button onclick="closeModal('modal-confirm')" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition">
+                    Cancelar
+                </button>
+                <button id="confirm-action-btn" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: ETIQUETA QR CODE INDIVIDUAL & SIMULAÇÃO DE LEITURA           -->
+    <!-- ===================================================================== -->
+    <div id="modal-qrcode" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden fade-in">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-qrcode text-brand-500 text-lg"></i>
+                    <div>
+                        <h2 class="text-base font-bold">Etiqueta QR Code do Equipamento</h2>
+                        <p class="text-[11px] text-slate-400">Identificação patrimonial e histórico rápido</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-qrcode')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-5">
+                <!-- Preview Visual da Etiqueta de Impressão -->
+                <div id="qr-label-preview" class="border-2 border-slate-900 rounded-2xl p-5 bg-white shadow-sm text-center space-y-3 relative overflow-hidden">
+                    <div class="flex items-center justify-between border-b-2 border-slate-900 pb-2">
+                        <div class="flex items-center gap-1.5 text-left">
+                            <span class="w-6 h-6 rounded-md bg-brand-600 text-white flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-fire-extinguisher"></i>
+                            </span>
+                            <span class="font-extrabold text-xs tracking-tight text-slate-900 uppercase">FireGuard Pro</span>
+                        </div>
+                        <span id="qr-lbl-code" class="text-base font-black tracking-wider text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-300">EXT-001</span>
+                    </div>
+
+                    <!-- Container onde o QRCode.js desenha o Canvas/IMG -->
+                    <div class="flex justify-center py-2">
+                        <div id="qrcode-canvas-box" class="p-3 bg-white border border-slate-200 rounded-xl inline-flex items-center justify-center"></div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div id="qr-lbl-type" class="text-sm font-bold text-slate-900">Extintor • Pó Químico ABC (6 kg)</div>
+                        <div id="qr-lbl-location" class="text-xs font-medium text-slate-600">Recepção Principal - Hall Térreo</div>
+                    </div>
+
+                    <div class="bg-slate-900 text-white rounded-xl py-2 px-3 flex items-center justify-between text-xs">
+                        <span class="uppercase tracking-wider text-[10px] text-slate-300 font-semibold">Vencimento Carga/Teste:</span>
+                        <span id="qr-lbl-expiry" class="font-extrabold text-sm text-amber-400">00/00/0000</span>
+                    </div>
+
+                    <p class="text-[11px] font-semibold text-slate-600 flex items-center justify-center gap-1.5 pt-0.5">
+                        <i class="fa-solid fa-mobile-screen-button text-brand-600"></i>
+                        <span>Escaneie para ver histórico e validade</span>
+                    </p>
+                </div>
+
+                <!-- Link codificado (para referência) -->
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                    <span id="qr-encoded-url" class="text-[11px] text-slate-500 truncate font-mono"></span>
+                    <button onclick="copyQrUrl()" class="px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shrink-0 transition">
+                        <i class="fa-regular fa-copy mr-1"></i>Copiar Link
+                    </button>
+                </div>
+
+                <!-- Botões de Ação do QR Code -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button id="btn-print-single-qr" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Imprimir Etiqueta</span>
+                    </button>
+                    <button id="btn-download-qr-png" class="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Baixar PNG</span>
+                    </button>
+                </div>
+
+                <button id="btn-simulate-qr-scan" class="w-full px-4 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-brand-600/20 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-expand"></i>
+                    <span>Simular Leitura do QR Code (Abrir Ficha)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // ESTADO GLOBAL E PERSISTÊNCIA (LOCAL STORAGE COM FALLBACK EM MEMÓRIA)
+        // =========================================================================
+        const STORAGE_KEY_EQ = 'fireguard_equipments_v1';
+        const STORAGE_KEY_HIST = 'fireguard_history_v1';
+
+        let equipments = [];
+        let historyRecords = [];
+        let currentStatusFilter = 'ALL';
+        let activeTab = 'equipments';
+
+        // Helpers de Data
+        function getTodayISO() {
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            return new Date(now - offset).toISOString().split('T')[0];
+        }
+
+        function addDaysISO(baseDateStr, days) {
+            const parts = baseDateStr.split('-');
+            const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            dt.setDate(dt.getDate() + days);
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatDateBR(dateStr) {
+            if (!dateStr) return '-';
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        function getDaysDifference(targetDateStr) {
+            if (!targetDateStr) return 0;
+            const todayStr = getTodayISO();
+            const [y1, m1, d1] = todayStr.split('-').map(Number);
+            const [y2, m2, d2] = targetDateStr.split('-').map(Number);
+            const t1 = new Date(y1, m1 - 1, d1).getTime();
+            const t2 = new Date(y2, m2 - 1, d2).getTime();
+            return Math.round((t2 - t1) / (1000 * 60 * 60 * 24));
+        }
+
+        // Calcula o status de vencimento do equipamento
+        function getEquipmentStatus(eq) {
+            const daysLeft = getDaysDifference(eq.expiryDate);
+            if (daysLeft < 0) {
+                return {
+                    code: 'EXPIRED',
+                    label: `Vencido há ${Math.abs(daysLeft)}d`,
+                    shortLabel: 'Vencido',
+                    daysLeft,
+                    badgeClass: 'bg-red-100 text-red-800 border-red-200',
+                    dotClass: 'bg-red-600'
+                };
+            } else if (daysLeft <= 30) {
+                return {
+                    code: 'WARNING',
+                    label: daysLeft === 0 ? 'Vence hoje!' : `Vence em ${daysLeft}d`,
+                    shortLabel: 'Próx. Vencimento',
+                    daysLeft,
+                    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+                    dotClass: 'bg-amber-500'
+                };
+            } else {
+                return {
+                    code: 'VALID',
+                    label: `Em dia (${daysLeft}d)`,
+                    shortLabel: 'Em Dia',
+                    daysLeft,
+                    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                    dotClass: 'bg-emerald-600'
+                };
+            }
+        }
+
+        // =========================================================================
+        // DADOS INICIAIS DE DEMONSTRAÇÃO (BASEADOS NA DATA ATUAL DO USUÁRIO)
+        // =========================================================================
+        function generateSeedData() {
+            const today = getTodayISO();
+
+            const seedEquipments = [
+                {
+                    id: 'eq-1',
+                    code: 'EXT-001',
+                    type: 'Extintor',
+                    subtype: 'Pó Químico ABC',
+                    capacity: '6 kg',
+                    location: 'Recepção Principal - Hall Térreo',
+                    lastMaintenance: addDaysISO(today, -375),
+                    expiryDate: addDaysISO(today, -10), // Vencido há 10 dias
+                    nextCheck: addDaysISO(today, -5),
+                    notes: 'Selo Inmetro #8849201. Necessita recarga urgente.'
+                },
+                {
+                    id: 'eq-2',
+                    code: 'EXT-002',
+                    type: 'Extintor',
+                    subtype: 'Gás Carbônico (CO2)',
+                    capacity: '6 kg',
+                    location: 'Sala de Servidores / CPD - 1º Andar',
+                    lastMaintenance: addDaysISO(today, -347),
+                    expiryDate: addDaysISO(today, 18), // Próximo do vencimento (18 dias)
+                    nextCheck: addDaysISO(today, 12),
+                    notes: 'Equipamento dedicado para painel elétrico e racks.'
+                },
+                {
+                    id: 'eq-3',
+                    code: 'EXT-003',
+                    type: 'Extintor',
+                    subtype: 'Água Pressurizada (AP)',
+                    capacity: '10 L',
+                    location: 'Almoxarifado Central - Corredor B',
+                    lastMaintenance: addDaysISO(today, -120),
+                    expiryDate: addDaysISO(today, 245), // Em dia
+                    nextCheck: addDaysISO(today, 22),
+                    notes: 'Suporte de parede sinalizado com placa fotoluminescente.'
+                },
+                {
+                    id: 'eq-4',
+                    code: 'HID-001',
+                    type: 'Hidrante',
+                    subtype: 'Hidrante de Parede (Abrigo)',
+                    capacity: 'Mangueira Tipo 2 - 30m (2x15m)',
+                    location: 'Garagem Subsolo G1 - Rampa Acesso',
+                    lastMaintenance: addDaysISO(today, -353),
+                    expiryDate: addDaysISO(today, 12), // Teste hidrostático da mangueira em 12 dias
+                    nextCheck: addDaysISO(today, 15),
+                    notes: 'Caixa metálica vermelha com esguicho regulável 1.1/2" e chave storz.'
+                },
+                {
+                    id: 'eq-5',
+                    code: 'HID-002',
+                    type: 'Hidrante',
+                    subtype: 'Hidrante de Coluna',
+                    capacity: 'Mangueira Tipo 2 - 30m',
+                    location: 'Pátio Externo / Docas de Carga',
+                    lastMaintenance: addDaysISO(today, -60),
+                    expiryDate: addDaysISO(today, 305), // Em dia
+                    nextCheck: addDaysISO(today, 25),
+                    notes: 'Mangueira substituída recentemente após teste hidrostático anual.'
+                },
+                {
+                    id: 'eq-6',
+                    code: 'EXT-004',
+                    type: 'Extintor',
+                    subtype: 'Espuma Mecânica',
+                    capacity: '10 L',
+                    location: 'Casa de Geradores / Combustível',
+                    lastMaintenance: addDaysISO(today, -395),
+                    expiryDate: addDaysISO(today, -30), // Vencido há 30 dias
+                    nextCheck: addDaysISO(today, -2),
+                    notes: 'Agendamento de troca de cilindro solicitado ao fornecedor.'
+                }
+            ];
+
+            const seedHistory = [
+                {
+                    id: 'hist-101',
+                    equipmentId: 'eq-1',
+                    equipmentCode: 'EXT-001',
+                    eventType: 'Checagem Periódica',
+                    date: addDaysISO(today, -35),
+                    inspector: 'Carlos Eduardo Silva (TST)',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: addDaysISO(today, -10),
+                    newExpiryDate: addDaysISO(today, -10),
+                    notes: 'Inspeção mensal realizada. Alerta emitido para programar recarga anual no próximo mês.'
+                },
+                {
+                    id: 'hist-102',
+                    equipmentId: 'eq-1',
+                    equipmentCode: 'EXT-001',
+                    eventType: 'Recarga',
+                    date: addDaysISO(today, -375),
+                    inspector: 'ExtinSeg Manutenção Ltda',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: addDaysISO(today, -375),
+                    newExpiryDate: addDaysISO(today, -10),
+                    notes: 'Recarga anual completa de pó químico ABC 6kg. Instalado selo Inmetro #8849201.'
+                },
+                {
+                    id: 'hist-103',
+                    equipmentId: 'eq-2',
+                    equipmentCode: 'EXT-002',
+                    eventType: 'Checagem Periódica',
+                    date: addDaysISO(today, -18),
+                    inspector: 'Mariana Costa (Brigadista)',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: addDaysISO(today, 18),
+                    newExpiryDate: addDaysISO(today, 18),
+                    notes: 'Pesagem visual e verificação de difusor CO2 sem avarias. Vencimento próximo.'
+                },
+                {
+                    id: 'hist-104',
+                    equipmentId: 'eq-5',
+                    equipmentCode: 'HID-002',
+                    eventType: 'Troca / Substituição',
+                    date: addDaysISO(today, -60),
+                    inspector: 'FireTech Engenharia',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: addDaysISO(today, -65),
+                    newExpiryDate: addDaysISO(today, 305),
+                    notes: 'Substituição de dois lances de mangueira de 15m que apresentaram ressecamento no teste anterior.'
+                },
+                {
+                    id: 'hist-105',
+                    equipmentId: 'eq-3',
+                    equipmentCode: 'EXT-003',
+                    eventType: 'Recarga',
+                    date: addDaysISO(today, -120),
+                    inspector: 'ExtinSeg Manutenção Ltda',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: addDaysISO(today, -122),
+                    newExpiryDate: addDaysISO(today, 245),
+                    notes: 'Recarga de água pressurizada 10L e pintura preventiva da base.'
+                },
+                {
+                    id: 'hist-106',
+                    equipmentId: 'eq-4',
+                    equipmentCode: 'HID-001',
+                    eventType: 'Checagem Periódica',
+                    date: addDaysISO(today, -15),
+                    inspector: 'Carlos Eduardo Silva (TST)',
+                    checklist: { seal: true, gauge: true, access: false, hose: true },
+                    oldExpiryDate: addDaysISO(today, 12),
+                    newExpiryDate: addDaysISO(today, 12),
+                    notes: 'Palete obstruindo parcialmente a porta do abrigo. Solicitada remoção imediata ao setor de logística.'
+                }
+            ];
+
+            return { seedEquipments, seedHistory };
+        }
+
+        function loadData() {
+            try {
+                const rawEq = localStorage.getItem(STORAGE_KEY_EQ);
+                const rawHist = localStorage.getItem(STORAGE_KEY_HIST);
+
+                if (rawEq && rawHist) {
+                    equipments = JSON.parse(rawEq);
+                    historyRecords = JSON.parse(rawHist);
+                } else {
+                    const { seedEquipments, seedHistory } = generateSeedData();
+                    equipments = seedEquipments;
+                    historyRecords = seedHistory;
+                    saveData();
+                }
+            } catch (e) {
+                console.warn('Storage indisponível, utilizando estado em memória.', e);
+                const { seedEquipments, seedHistory } = generateSeedData();
+                equipments = seedEquipments;
+                historyRecords = seedHistory;
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY_EQ, JSON.stringify(equipments));
+                localStorage.setItem(STORAGE_KEY_HIST, JSON.stringify(historyRecords));
+            } catch (e) {
+                console.warn('Erro ao persistir dados localmente:', e);
+            }
+        }
+
+        // =========================================================================
+        // RENDERIZAÇÃO DO DASHBOARD (KPIs) E TABELAS
+        // =========================================================================
+        function renderAll() {
+            renderKPIs();
+            renderEquipments();
+            populateHistoryEquipmentFilter();
+            renderGlobalHistory();
+            document.getElementById('badge-count-equipments').textContent = equipments.length;
+            document.getElementById('badge-count-history').textContent = historyRecords.length;
+        }
+
+        function renderKPIs() {
+            let total = equipments.length;
+            let valid = 0;
+            let warning = 0;
+            let expired = 0;
+
+            equipments.forEach(eq => {
+                const st = getEquipmentStatus(eq).code;
+                if (st === 'VALID') valid++;
+                else if (st === 'WARNING') warning++;
+                else if (st === 'EXPIRED') expired++;
+            });
+
+            const kpis = [
+                {
+                    label: 'Total Equipamentos',
+                    value: total,
+                    sub: `${equipments.filter(e => e.type === 'Extintor').length} Ext. • ${equipments.filter(e => e.type === 'Hidrante').length} Hidr.`,
+                    icon: 'fa-shield-halved',
+                    iconBg: 'bg-slate-100 text-slate-700',
+                    border: 'border-slate-200',
+                    action: "setStatusFilter('ALL'); switchTab('equipments')"
+                },
+                {
+                    label: 'Em Dia (Válidos)',
+                    value: valid,
+                    sub: 'Validade > 30 dias',
+                    icon: 'fa-circle-check',
+                    iconBg: 'bg-emerald-100 text-emerald-700',
+                    border: 'border-emerald-200/80',
+                    action: "setStatusFilter('VALID'); switchTab('equipments')"
+                },
+                {
+                    label: 'Próx. Vencimento',
+                    value: warning,
+                    sub: 'Alerta ≤ 30 dias',
+                    icon: 'fa-clock',
+                    iconBg: 'bg-amber-100 text-amber-700',
+                    border: 'border-amber-200/80',
+                    action: "setStatusFilter('WARNING'); switchTab('equipments')"
+                },
+                {
+                    label: 'Vencidos',
+                    value: expired,
+                    sub: 'Ação imediata',
+                    icon: 'fa-triangle-exclamation',
+                    iconBg: 'bg-red-100 text-red-700',
+                    border: expired > 0 ? 'border-red-300 ring-1 ring-red-200' : 'border-slate-200',
+                    action: "setStatusFilter('EXPIRED'); switchTab('equipments')"
+                },
+                {
+                    label: 'Checagens / Trocas',
+                    value: historyRecords.length,
+                    sub: 'Registros históricos',
+                    icon: 'fa-clipboard-check',
+                    iconBg: 'bg-blue-100 text-blue-700',
+                    border: 'border-slate-200',
+                    action: "switchTab('history')"
+                }
+            ];
+
+            const container = document.getElementById('kpi-container');
+            container.innerHTML = kpis.map(kpi => `
+                <div onclick="${kpi.action}" class="bg-white rounded-2xl p-4 border ${kpi.border} shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between group">
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="text-xs font-semibold text-slate-500 group-hover:text-slate-800 transition">${kpi.label}</span>
+                        <div class="w-8 h-8 rounded-xl ${kpi.iconBg} flex items-center justify-center shrink-0">
+                            <i class="fa-solid ${kpi.icon} text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">${kpi.value}</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5 font-medium">${kpi.sub}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setStatusFilter(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.status-pill').forEach(btn => {
+                if (btn.dataset.status === status) {
+                    btn.className = 'status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-white text-slate-900 shadow-sm';
+                } else {
+                    btn.className = 'status-pill px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900';
+                }
+            });
+            renderEquipments();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-equipment').value = '';
+            renderEquipments();
+        }
+
+        function renderEquipments() {
+            const searchInput = document.getElementById('search-equipment');
+            const query = searchInput.value.trim().toLowerCase();
+            const categoryFilter = document.getElementById('filter-category').value;
+
+            document.getElementById('clear-search-btn').classList.toggle('hidden', query.length === 0);
+
+            // Ordena: Vencidos primeiro, depois próximos do vencimento, depois por data mais próxima
+            const sorted = [...equipments].sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+
+            const filtered = sorted.filter(eq => {
+                const st = getEquipmentStatus(eq).code;
+                if (currentStatusFilter !== 'ALL' && st !== currentStatusFilter) return false;
+                if (categoryFilter !== 'ALL' && eq.type !== categoryFilter) return false;
+
+                if (query) {
+                    const hay = `${eq.code} ${eq.type} ${eq.subtype} ${eq.capacity} ${eq.location} ${eq.notes || ''}`.toLowerCase();
+                    if (!hay.includes(query)) return false;
+                }
+                return true;
+            });
+
+            const tbody = document.getElementById('equipments-table-body');
+            const emptyState = document.getElementById('empty-equipments');
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            tbody.innerHTML = filtered.map(eq => {
+                const status = getEquipmentStatus(eq);
+                const eqHistoryCount = historyRecords.filter(h => h.equipmentId === eq.id).length;
+                const isExt = eq.type === 'Extintor';
+                const checkDays = getDaysDifference(eq.nextCheck);
+                const checkOverdue = checkDays < 0;
+
+                return `
+                    <tr class="hover:bg-slate-50/90 transition group">
+                        <td class="py-3.5 px-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl ${isExt ? 'bg-brand-50 text-brand-600 border-brand-200' : 'bg-blue-50 text-blue-600 border-blue-200'} border flex items-center justify-center shrink-0">
+                                    <i class="fa-solid ${isExt ? 'fa-fire-extinguisher' : 'fa-faucet-drip'}"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="openDetailsModal('${eq.id}')" class="font-bold text-slate-900 hover:text-brand-600 transition text-left">
+                                            ${eq.code}
+                                        </button>
+                                        <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">${eq.capacity}</span>
+                                    </div>
+                                    <div class="text-xs text-slate-500">${eq.subtype}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <div class="text-sm font-medium text-slate-800">${eq.location}</div>
+                            <div class="text-[11px] text-slate-400">${eqHistoryCount} registro(s) no histórico</div>
+                        </td>
+                        <td class="py-3.5 px-4 text-xs text-slate-600 font-medium">
+                            ${formatDateBR(eq.lastMaintenance)}
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <div class="text-sm font-bold ${status.code === 'EXPIRED' ? 'text-red-700' : status.code === 'WARNING' ? 'text-amber-700' : 'text-slate-800'}">
+                                ${formatDateBR(eq.expiryDate)}
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <div class="text-xs font-medium ${checkOverdue ? 'text-red-600 font-semibold' : 'text-slate-600'}">
+                                ${formatDateBR(eq.nextCheck)}
+                                ${checkOverdue ? '<span class="block text-[10px] text-red-500">Checagem atrasada</span>' : ''}
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${status.badgeClass}">
+                                <span class="w-1.5 h-1.5 rounded-full ${status.dotClass}"></span>
+                                ${status.label}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <button onclick="openQrCodeModal('${eq.id}')" title="Gerar Etiqueta QR Code" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition flex items-center gap-1">
+                                    <i class="fa-solid fa-qrcode text-brand-400"></i>
+                                    <span class="hidden xl:inline">QR Code</span>
+                                </button>
+                                <button onclick="openEventModal('${eq.id}')" title="Registrar Checagem / Troca" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 text-xs font-semibold transition flex items-center gap-1">
+                                    <i class="fa-solid fa-clipboard-check"></i>
+                                    <span class="hidden xl:inline">Checar/Trocar</span>
+                                </button>
+                                <button onclick="openDetailsModal('${eq.id}')" title="Ver Histórico Completo" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </button>
+                                <button onclick="openEquipmentModal('${eq.id}')" title="Editar Equipamento" class="p-2 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 text-xs transition">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="confirmDeleteEquipment('${eq.id}')" title="Excluir Equipamento" class="p-2 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-700 hover:text-red-700 text-xs transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // =========================================================================
+        // RENDERIZAÇÃO DO HISTÓRICO (GERAL E INDIVIDUAL)
+        // =========================================================================
+        function getEventBadgeStyle(eventType) {
+            switch (eventType) {
+                case 'Recarga':
+                    return { bg: 'bg-blue-100 text-blue-800 border-blue-200', icon: 'fa-arrows-rotate', dot: 'bg-blue-600' };
+                case 'Troca / Substituição':
+                    return { bg: 'bg-purple-100 text-purple-800 border-purple-200', icon: 'fa-right-left', dot: 'bg-purple-600' };
+                case 'Teste Hidrostático':
+                    return { bg: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: 'fa-flask', dot: 'bg-indigo-600' };
+                case 'Manutenção Corretiva':
+                    return { bg: 'bg-amber-100 text-amber-800 border-amber-200', icon: 'fa-wrench', dot: 'bg-amber-600' };
+                default: // Checagem Periódica
+                    return { bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: 'fa-clipboard-check', dot: 'bg-emerald-600' };
+            }
+        }
+
+        function renderChecklistPills(chk) {
+            if (!chk) return '';
+            const items = [
+                { key: 'seal', label: 'Lacre' },
+                { key: 'gauge', label: 'Pressão' },
+                { key: 'access', label: 'Acesso' },
+                { key: 'hose', label: 'Mangueira/Bico' }
+            ];
+            return items.map(item => {
+                const ok = chk[item.key];
+                return `
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : 'bg-red-50 text-red-700 border border-red-200/80'}">
+                        <i class="fa-solid ${ok ? 'fa-check' : 'fa-xmark'} text-[10px]"></i>
+                        ${item.label}
+                    </span>
+                `;
+            }).join('');
+        }
+
+        function populateHistoryEquipmentFilter() {
+            const select = document.getElementById('hist-filter-equipment');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="ALL">Todos os Equipamentos</option>' +
+                equipments.map(eq => `<option value="${eq.id}">${eq.code} - ${eq.subtype} (${eq.location})</option>`).join('');
+            if ([...select.options].some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        function resetHistoryFilters() {
+            document.getElementById('hist-filter-equipment').value = 'ALL';
+            document.getElementById('hist-filter-type').value = 'ALL';
+            document.getElementById('hist-filter-start').value = '';
+            document.getElementById('hist-filter-end').value = '';
+            renderGlobalHistory();
+        }
+
+        function renderGlobalHistory() {
+            const eqFilter = document.getElementById('hist-filter-equipment').value;
+            const typeFilter = document.getElementById('hist-filter-type').value;
+            const startFilter = document.getElementById('hist-filter-start').value;
+            const endFilter = document.getElementById('hist-filter-end').value;
+
+            const sorted = [...historyRecords].sort((a, b) => b.date.localeCompare(a.date));
+
+            const filtered = sorted.filter(rec => {
+                if (eqFilter !== 'ALL' && rec.equipmentId !== eqFilter) return false;
+                if (typeFilter !== 'ALL' && rec.eventType !== typeFilter) return false;
+                if (startFilter && rec.date < startFilter) return false;
+                if (endFilter && rec.date > endFilter) return false;
+                return true;
+            });
+
+            const container = document.getElementById('global-history-list');
+            const emptyState = document.getElementById('empty-history');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            container.innerHTML = filtered.map(rec => {
+                const style = getEventBadgeStyle(rec.eventType);
+                const eqObj = equipments.find(e => e.id === rec.equipmentId);
+                const eqTitle = eqObj ? `${eqObj.code} • ${eqObj.subtype} (${eqObj.location})` : `${rec.equipmentCode} (Equipamento removido)`;
+                const dateChanged = rec.oldExpiryDate && rec.newExpiryDate && rec.oldExpiryDate !== rec.newExpiryDate;
+
+                return `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="space-y-2 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                                    <i class="fa-regular fa-calendar mr-1 text-slate-500"></i>${formatDateBR(rec.date)}
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${style.bg}">
+                                    <i class="fa-solid ${style.icon}"></i>
+                                    ${rec.eventType}
+                                </span>
+                                ${eqObj ? `
+                                    <button onclick="openDetailsModal('${eqObj.id}')" class="text-xs font-bold text-brand-700 hover:underline">
+                                        ${eqTitle}
+                                    </button>
+                                ` : `<span class="text-xs font-semibold text-slate-500">${eqTitle}</span>`}
+                            </div>
+
+                            <p class="text-sm text-slate-700">${rec.notes || '<span class="italic text-slate-400">Sem observações adicionais.</span>'}</p>
+
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                ${renderChecklistPills(rec.checklist)}
+                                ${dateChanged ? `
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 text-[11px] font-semibold">
+                                        <i class="fa-solid fa-calendar-check"></i>
+                                        Validade atualizada: ${formatDateBR(rec.oldExpiryDate)} → ${formatDateBR(rec.newExpiryDate)}
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div class="sm:text-right shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 flex sm:flex-col justify-between items-center sm:items-end gap-1">
+                            <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Responsável</span>
+                            <span class="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                                <i class="fa-solid fa-user-check text-slate-400 mr-1"></i>${rec.inspector}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // =========================================================================
+        // MODAIS E AÇÕES CRUD (EQUIPAMENTOS E EVENTOS)
+        // =========================================================================
+        function switchTab(tabName) {
+            activeTab = tabName;
+            const eqView = document.getElementById('view-equipments');
+            const histView = document.getElementById('view-history');
+            const eqBtn = document.getElementById('tab-btn-equipments');
+            const histBtn = document.getElementById('tab-btn-history');
+
+            if (tabName === 'equipments') {
+                eqView.classList.remove('hidden');
+                histView.classList.add('hidden');
+                eqBtn.className = 'tab-btn py-3.5 px-3 sm:px-4 text-sm font-semibold border-b-2 border-brand-600 text-brand-700 flex items-center gap-2 transition';
+                histBtn.className = 'tab-btn py-3.5 px-3 sm:px-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center gap-2 transition';
+            } else {
+                eqView.classList.add('hidden');
+                histView.classList.remove('hidden');
+                histBtn.className = 'tab-btn py-3.5 px-3 sm:px-4 text-sm font-semibold border-b-2 border-brand-600 text-brand-700 flex items-center gap-2 transition';
+                eqBtn.className = 'tab-btn py-3.5 px-3 sm:px-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center gap-2 transition';
+                renderGlobalHistory();
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Modal 1: Abrir Cadastro/Edição de Equipamento
+        function openEquipmentModal(eqId = null) {
+            const form = document.getElementById('form-equipment');
+            form.reset();
+            const today = getTodayISO();
+
+            if (eqId) {
+                const eq = equipments.find(e => e.id === eqId);
+                if (!eq) return;
+                document.getElementById('modal-equipment-title').textContent = `Editar Equipamento (${eq.code})`;
+                document.getElementById('eq-id').value = eq.id;
+                document.getElementById('eq-code').value = eq.code;
+                document.getElementById('eq-type').value = eq.type;
+                document.getElementById('eq-capacity').value = eq.capacity;
+                document.getElementById('eq-subtype').value = eq.subtype;
+                document.getElementById('eq-location').value = eq.location;
+                document.getElementById('eq-last-maintenance').value = eq.lastMaintenance;
+                document.getElementById('eq-expiry-date').value = eq.expiryDate;
+                document.getElementById('eq-next-check').value = eq.nextCheck;
+                document.getElementById('eq-notes').value = eq.notes || '';
+            } else {
+                document.getElementById('modal-equipment-title').textContent = 'Cadastrar Novo Equipamento';
+                document.getElementById('eq-id').value = '';
+                // Sugere próximo código automaticamente
+                const extCount = equipments.filter(e => e.type === 'Extintor').length + 1;
+                document.getElementById('eq-code').value = `EXT-${String(extCount).padStart(3, '0')}`;
+                document.getElementById('eq-last-maintenance').value = today;
+                document.getElementById('eq-expiry-date').value = addDaysISO(today, 365);
+                document.getElementById('eq-next-check').value = addDaysISO(today, 30);
+            }
+
+            document.getElementById('modal-equipment').classList.remove('hidden');
+        }
+
+        function updateSubtypeSuggestions() {
+            const type = document.getElementById('eq-type').value;
+            const id = document.getElementById('eq-id').value;
+            if (!id) {
+                const count = equipments.filter(e => e.type === type).length + 1;
+                const prefix = type === 'Extintor' ? 'EXT' : 'HID';
+                document.getElementById('eq-code').value = `${prefix}-${String(count).padStart(3, '0')}`;
+            }
+        }
+
+        function saveEquipment(e) {
+            e.preventDefault();
+            const id = document.getElementById('eq-id').value;
+            const code = document.getElementById('eq-code').value.trim().toUpperCase();
+            const type = document.getElementById('eq-type').value;
+            const capacity = document.getElementById('eq-capacity').value.trim();
+            const subtype = document.getElementById('eq-subtype').value.trim();
+            const location = document.getElementById('eq-location').value.trim();
+            const lastMaintenance = document.getElementById('eq-last-maintenance').value;
+            const expiryDate = document.getElementById('eq-expiry-date').value;
+            const nextCheck = document.getElementById('eq-next-check').value;
+            const notes = document.getElementById('eq-notes').value.trim();
+
+            if (id) {
+                const idx = equipments.findIndex(item => item.id === id);
+                if (idx !== -1) {
+                    equipments[idx] = { ...equipments[idx], code, type, capacity, subtype, location, lastMaintenance, expiryDate, nextCheck, notes };
+                    showToast(`Equipamento ${code} atualizado com sucesso!`, 'success');
+                }
+            } else {
+                const newEq = {
+                    id: 'eq-' + Date.now(),
+                    code,
+                    type,
+                    capacity,
+                    subtype,
+                    location,
+                    lastMaintenance,
+                    expiryDate,
+                    nextCheck,
+                    notes
+                };
+                equipments.push(newEq);
+
+                // Cria registro inicial no histórico automaticamente
+                historyRecords.unshift({
+                    id: 'hist-' + Date.now(),
+                    equipmentId: newEq.id,
+                    equipmentCode: newEq.code,
+                    eventType: 'Checagem Periódica',
+                    date: lastMaintenance || getTodayISO(),
+                    inspector: 'Cadastro Inicial do Sistema',
+                    checklist: { seal: true, gauge: true, access: true, hose: true },
+                    oldExpiryDate: expiryDate,
+                    newExpiryDate: expiryDate,
+                    notes: `Equipamento cadastrado no sistema. Validade inicial definida para ${formatDateBR(expiryDate)}.`
+                });
+
+                showToast(`Equipamento ${code} cadastrado com sucesso!`, 'success');
+            }
+
+            saveData();
+            closeModal('modal-equipment');
+            renderAll();
+        }
+
+        // Modal 2: Registrar Checagem / Troca / Recarga
+        function openEventModal(eqId) {
+            const eq = equipments.find(e => e.id === eqId);
+            if (!eq) return;
+
+            const today = getTodayISO();
+            document.getElementById('form-event').reset();
+            document.getElementById('ev-equipment-id').value = eq.id;
+            document.getElementById('ev-date').value = today;
+            document.getElementById('ev-new-next-check').value = addDaysISO(today, 30);
+            checkAllChecklist(true);
+
+            const status = getEquipmentStatus(eq);
+            document.getElementById('ev-equipment-banner').innerHTML = `
+                <div>
+                    <span class="font-bold text-slate-900 text-sm">${eq.code} — ${eq.subtype} (${eq.capacity})</span>
+                    <span class="block text-slate-500 mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${eq.location}</span>
+                </div>
+                <div class="text-right">
+                    <span class="block text-[10px] uppercase font-semibold text-slate-400">Vencimento Atual</span>
+                    <span class="font-bold ${status.code === 'EXPIRED' ? 'text-red-600' : 'text-slate-800'}">${formatDateBR(eq.expiryDate)}</span>
+                </div>
+            `;
+
+            handleEventTypeChange();
+            document.getElementById('modal-event').classList.remove('hidden');
+        }
+
+        function handleEventTypeChange() {
+            const evType = document.getElementById('ev-type').value;
+            const evDate = document.getElementById('ev-date').value || getTodayISO();
+            const eqId = document.getElementById('ev-equipment-id').value;
+            const eq = equipments.find(e => e.id === eqId);
+
+            const expiryInput = document.getElementById('ev-new-expiry');
+            const hint = document.getElementById('ev-expiry-hint');
+            document.getElementById('ev-new-next-check').value = addDaysISO(evDate, 30);
+
+            if (evType === 'Recarga' || evType === 'Troca / Substituição') {
+                expiryInput.value = addDaysISO(evDate, 365);
+                hint.textContent = 'Sugerido automaticamente +1 ano (365 dias) a partir da data do evento.';
+            } else if (evType === 'Teste Hidrostático') {
+                expiryInput.value = addDaysISO(evDate, 1825); // 5 anos
+                hint.textContent = 'Sugerido automaticamente +5 anos (norma teste hidrostático).';
+            } else {
+                expiryInput.value = eq ? eq.expiryDate : '';
+                hint.textContent = 'Mantida a validade atual do equipamento (altere se necessário).';
+            }
+        }
+
+        function checkAllChecklist(state) {
+            document.getElementById('chk-seal').checked = state;
+            document.getElementById('chk-gauge').checked = state;
+            document.getElementById('chk-access').checked = state;
+            document.getElementById('chk-hose').checked = state;
+        }
+
+        function saveEventRecord(e) {
+            e.preventDefault();
+            const eqId = document.getElementById('ev-equipment-id').value;
+            const eqIndex = equipments.findIndex(item => item.id === eqId);
+            if (eqIndex === -1) return;
+
+            const eq = equipments[eqIndex];
+            const eventType = document.getElementById('ev-type').value;
+            const date = document.getElementById('ev-date').value;
+            const inspector = document.getElementById('ev-inspector').value.trim();
+            const newExpiry = document.getElementById('ev-new-expiry').value || eq.expiryDate;
+            const newNextCheck = document.getElementById('ev-new-next-check').value;
+            const notes = document.getElementById('ev-notes').value.trim();
+
+            const checklist = {
+                seal: document.getElementById('chk-seal').checked,
+                gauge: document.getElementById('chk-gauge').checked,
+                access: document.getElementById('chk-access').checked,
+                hose: document.getElementById('chk-hose').checked
+            };
+
+            const record = {
+                id: 'hist-' + Date.now(),
+                equipmentId: eq.id,
+                equipmentCode: eq.code,
+                eventType,
+                date,
+                inspector,
+                checklist,
+                oldExpiryDate: eq.expiryDate,
+                newExpiryDate: newExpiry,
+                notes
+            };
+
+            historyRecords.unshift(record);
+
+            // Atualiza datas do equipamento
+            eq.nextCheck = newNextCheck;
+            eq.expiryDate = newExpiry;
+            if (eventType !== 'Checagem Periódica') {
+                eq.lastMaintenance = date;
+            }
+
+            equipments[eqIndex] = eq;
+            saveData();
+            closeModal('modal-event');
+            renderAll();
+
+            // Se o modal de detalhes estiver aberto para este equipamento, atualiza ele também
+            if (!document.getElementById('modal-details').classList.contains('hidden')) {
+                openDetailsModal(eq.id);
+            }
+
+            // Se a tela dedicada de leitura QR Code estiver aberta para este equipamento, atualiza ela também
+            if (!document.getElementById('qr-scanner-view').classList.contains('hidden')) {
+                openQrScannerView(eq.code);
+            }
+
+            showToast(`${eventType} registrada para ${eq.code}!`, 'success');
+        }
+
+        // Modal 3: Detalhes e Timeline Individual
+        function openDetailsModal(eqId) {
+            const eq = equipments.find(e => e.id === eqId);
+            if (!eq) return;
+
+            const status = getEquipmentStatus(eq);
+            const isExt = eq.type === 'Extintor';
+
+            document.getElementById('det-icon-box').innerHTML = `<i class="fa-solid ${isExt ? 'fa-fire-extinguisher' : 'fa-faucet-drip'}"></i>`;
+            document.getElementById('det-code').textContent = eq.code;
+            document.getElementById('det-subtitle').textContent = `${eq.type} • ${eq.subtype} (${eq.capacity})`;
+            document.getElementById('det-status-badge').innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${status.badgeClass}">
+                    <span class="w-1.5 h-1.5 rounded-full ${status.dotClass}"></span>
+                    ${status.label}
+                </span>
+            `;
+
+            document.getElementById('det-location').textContent = eq.location;
+            document.getElementById('det-last-maint').textContent = formatDateBR(eq.lastMaintenance);
+            document.getElementById('det-expiry').textContent = formatDateBR(eq.expiryDate);
+            document.getElementById('det-next-check').textContent = formatDateBR(eq.nextCheck);
+            document.getElementById('det-notes').textContent = eq.notes || 'Nenhuma observação cadastrada.';
+
+            document.getElementById('det-btn-qrcode').onclick = () => {
+                openQrCodeModal(eq.id);
+            };
+            document.getElementById('det-btn-edit').onclick = () => {
+                closeModal('modal-details');
+                openEquipmentModal(eq.id);
+            };
+            document.getElementById('det-btn-new-event').onclick = () => {
+                openEventModal(eq.id);
+            };
+
+            const eqEvents = historyRecords
+                .filter(h => h.equipmentId === eq.id)
+                .sort((a, b) => b.date.localeCompare(a.date));
+
+            document.getElementById('det-history-count').textContent = eqEvents.length;
+
+            const timelineEl = document.getElementById('det-timeline');
+            if (eqEvents.length === 0) {
+                timelineEl.innerHTML = `<p class="text-sm text-slate-500 italic">Nenhuma checagem ou troca registrada para este equipamento até o momento.</p>`;
+            } else {
+                timelineEl.innerHTML = eqEvents.map(ev => {
+                    const style = getEventBadgeStyle(ev.eventType);
+                    const dateChanged = ev.oldExpiryDate && ev.newExpiryDate && ev.oldExpiryDate !== ev.newExpiryDate;
+
+                    return `
+                        <div class="relative bg-slate-50/80 rounded-xl p-4 border border-slate-200">
+                            <span class="absolute -left-[31px] top-4 w-3.5 h-3.5 rounded-full ${style.dot} ring-4 ring-white"></span>
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${style.bg}">
+                                        <i class="fa-solid ${style.icon}"></i>
+                                        ${ev.eventType}
+                                    </span>
+                                    <span class="text-xs font-bold text-slate-700">${formatDateBR(ev.date)}</span>
+                                </div>
+                                <span class="text-xs font-medium text-slate-500">
+                                    <i class="fa-solid fa-user-check mr-1"></i>${ev.inspector}
+                                </span>
+                            </div>
+
+                            <p class="text-sm text-slate-700 mb-2.5">${ev.notes || '<span class="italic text-slate-400">Sem observações.</span>'}</p>
+
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                ${renderChecklistPills(ev.checklist)}
+                                ${dateChanged ? `
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[11px] font-semibold">
+                                        <i class="fa-solid fa-calendar-check"></i>
+                                        Vencimento: ${formatDateBR(ev.oldExpiryDate)} → ${formatDateBR(ev.newExpiryDate)}
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('modal-details').classList.remove('hidden');
+        }
+
+        // Exclusão com Modal de Confirmação Personalizado
+        function confirmDeleteEquipment(eqId) {
+            const eq = equipments.find(e => e.id === eqId);
+            if (!eq) return;
+
+            document.getElementById('confirm-title').textContent = `Excluir ${eq.code}?`;
+            document.getElementById('confirm-message').textContent = `Tem certeza que deseja remover o equipamento "${eq.code} - ${eq.subtype}" (${eq.location})? Os registros históricos vinculados serão mantidos para auditoria.`;
+
+            const btn = document.getElementById('confirm-action-btn');
+            btn.onclick = () => {
+                equipments = equipments.filter(item => item.id !== eqId);
+                saveData();
+                closeModal('modal-confirm');
+                renderAll();
+                showToast(`Equipamento ${eq.code} excluído.`, 'info');
+            };
+
+            document.getElementById('modal-confirm').classList.remove('hidden');
+        }
+
+        function confirmResetDemoData() {
+            document.getElementById('confirm-title').textContent = 'Restaurar Dados de Demonstração?';
+            document.getElementById('confirm-message').textContent = 'Isso substituirá os dados atuais pelos exemplos iniciais de extintores, hidrantes e históricos.';
+
+            const btn = document.getElementById('confirm-action-btn');
+            btn.onclick = () => {
+                const { seedEquipments, seedHistory } = generateSeedData();
+                equipments = seedEquipments;
+                historyRecords = seedHistory;
+                saveData();
+                closeModal('modal-confirm');
+                renderAll();
+                showToast('Dados de demonstração restaurados!', 'success');
+            };
+
+            document.getElementById('modal-confirm').classList.remove('hidden');
+        }
+
+        // =========================================================================
+        // GERAÇÃO DE QR CODE, ETIQUETAS PARA IMPRESSÃO E LEITURA DEDICADA
+        // =========================================================================
+        function buildEquipmentQrUrl(code) {
+            const baseUrl = window.location.href.split('#')[0];
+            return `${baseUrl}#equip=${encodeURIComponent(code)}`;
+        }
+
+        function openQrCodeModal(eqId) {
+            const eq = equipments.find(e => e.id === eqId);
+            if (!eq) return;
+
+            const qrUrl = buildEquipmentQrUrl(eq.code);
+            document.getElementById('qr-lbl-code').textContent = eq.code;
+            document.getElementById('qr-lbl-type').textContent = `${eq.type} • ${eq.subtype} (${eq.capacity})`;
+            document.getElementById('qr-lbl-location').textContent = eq.location;
+            document.getElementById('qr-lbl-expiry').textContent = formatDateBR(eq.expiryDate);
+            document.getElementById('qr-encoded-url').textContent = qrUrl;
+
+            const canvasBox = document.getElementById('qrcode-canvas-box');
+            canvasBox.innerHTML = '';
+
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(canvasBox, {
+                    text: qrUrl,
+                    width: 176,
+                    height: 176,
+                    colorDark: '#0f172a',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } else {
+                canvasBox.innerHTML = `<div class="p-4 text-xs text-red-600">Biblioteca QRCode não carregada.</div>`;
+            }
+
+            document.getElementById('btn-print-single-qr').onclick = () => printSingleQrLabel(eq.id);
+            document.getElementById('btn-download-qr-png').onclick = () => downloadQrCodePNG(eq.code);
+            document.getElementById('btn-simulate-qr-scan').onclick = () => {
+                closeModal('modal-qrcode');
+                closeModal('modal-details');
+                window.location.hash = `equip=${encodeURIComponent(eq.code)}`;
+                openQrScannerView(eq.code);
+            };
+
+            document.getElementById('modal-qrcode').classList.remove('hidden');
+        }
+
+        function copyQrUrl() {
+            const text = document.getElementById('qr-encoded-url').textContent;
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('Link do QR Code copiado!', 'success');
+        }
+
+        function downloadQrCodePNG(code) {
+            const canvasBox = document.getElementById('qrcode-canvas-box');
+            const canvas = canvasBox.querySelector('canvas');
+            const img = canvasBox.querySelector('img');
+
+            let dataUrl = '';
+            if (canvas) {
+                dataUrl = canvas.toDataURL('image/png');
+            } else if (img && img.src) {
+                dataUrl = img.src;
+            }
+
+            if (!dataUrl) {
+                showToast('Não foi possível gerar a imagem PNG.', 'error');
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `QRCode_${code}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(`Imagem QRCode_${code}.png baixada!`, 'success');
+        }
+
+        function createPrintableLabelHTML(eq, qrElementId) {
+            return `
+                <div class="qr-label-card border-2 border-slate-900 rounded-xl p-4 bg-white text-center flex flex-col justify-between">
+                    <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5 mb-2">
+                        <span class="font-extrabold text-[11px] uppercase tracking-tight text-slate-900">FireGuard Pro</span>
+                        <span class="text-sm font-black tracking-wider text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-400">${eq.code}</span>
+                    </div>
+                    <div id="${qrElementId}" class="my-1.5 flex justify-center items-center"></div>
+                    <div class="my-1">
+                        <div class="text-xs font-bold text-slate-900 leading-tight">${eq.type} • ${eq.subtype} (${eq.capacity})</div>
+                        <div class="text-[11px] text-slate-700 leading-tight mt-0.5">${eq.location}</div>
+                    </div>
+                    <div class="bg-slate-900 text-white rounded-lg py-1.5 px-2.5 flex items-center justify-between text-[11px] mt-1.5">
+                        <span class="uppercase text-[9px] text-slate-200 font-semibold">Vencimento:</span>
+                        <span class="font-extrabold text-xs text-white">${formatDateBR(eq.expiryDate)}</span>
+                    </div>
+                    <p class="text-[10px] font-semibold text-slate-700 mt-1.5">Escaneie para ver histórico e validade</p>
+                </div>
+            `;
+        }
+
+        function printSingleQrLabel(eqId) {
+            const eq = equipments.find(e => e.id === eqId);
+            if (!eq) return;
+
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = `
+                <div class="max-w-xs mx-auto">
+                    ${createPrintableLabelHTML(eq, 'print-qr-single')}
+                </div>
+            `;
+
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(document.getElementById('print-qr-single'), {
+                    text: buildEquipmentQrUrl(eq.code),
+                    width: 160,
+                    height: 160,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+
+            setTimeout(() => {
+                window.print();
+            }, 150);
+        }
+
+        function printAllQrLabels() {
+            if (equipments.length === 0) {
+                showToast('Nenhum equipamento cadastrado para imprimir etiquetas.', 'info');
+                return;
+            }
+
+            const printArea = document.getElementById('print-area');
+            const sorted = [...equipments].sort((a, b) => a.code.localeCompare(b.code));
+
+            printArea.innerHTML = `
+                <div class="mb-4 pb-2 border-b border-slate-300 flex items-center justify-between">
+                    <div>
+                        <h1 class="text-base font-bold text-slate-900">Etiquetas de Identificação QR Code — FireGuard Pro</h1>
+                        <p class="text-xs text-slate-600">Total: ${sorted.length} equipamento(s) • Emitido em ${formatDateBR(getTodayISO())}</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    ${sorted.map((eq, idx) => createPrintableLabelHTML(eq, `print-qr-batch-${idx}`)).join('')}
+                </div>
+            `;
+
+            if (typeof QRCode !== 'undefined') {
+                sorted.forEach((eq, idx) => {
+                    new QRCode(document.getElementById(`print-qr-batch-${idx}`), {
+                        text: buildEquipmentQrUrl(eq.code),
+                        width: 128,
+                        height: 128,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                });
+            }
+
+            setTimeout(() => {
+                window.print();
+            }, 250);
+        }
+
+        // =========================================================================
+        // TELA DEDICADA DE LEITURA DO QR CODE (#equip=CODIGO)
+        // =========================================================================
+        function openQrScannerView(equipCode) {
+            const decodedCode = decodeURIComponent(equipCode || '').trim().toUpperCase();
+            const eq = equipments.find(e => e.code.toUpperCase() === decodedCode);
+
+            const mainApp = document.getElementById('main-app-wrapper');
+            const qrView = document.getElementById('qr-scanner-view');
+            const container = document.getElementById('qr-scanner-content');
+
+            mainApp.classList.add('hidden');
+            qrView.classList.remove('hidden');
+            qrView.classList.add('flex');
+            window.scrollTo(0, 0);
+
+            if (!eq) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl p-8 text-center shadow-sm border border-slate-200 space-y-4">
+                        <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto text-2xl">
+                            <i class="fa-solid fa-circle-question"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-slate-900">Equipamento "${decodedCode}" não encontrado</h2>
+                        <p class="text-sm text-slate-600">Este código QR não corresponde a nenhum extintor ou hidrante ativo na base local deste dispositivo.</p>
+                        <button onclick="exitQrView()" class="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">
+                            Ir para o Painel Geral
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const status = getEquipmentStatus(eq);
+            const isExt = eq.type === 'Extintor';
+
+            // Cores semânticas fortes para o card de status
+            let statusBannerStyle = 'bg-emerald-600 text-white border-emerald-700';
+            let statusIcon = 'fa-circle-check';
+            let statusSubtext = 'Equipamento dentro do prazo de validade.';
+
+            if (status.code === 'EXPIRED') {
+                statusBannerStyle = 'bg-red-600 text-white border-red-700';
+                statusIcon = 'fa-triangle-exclamation';
+                statusSubtext = 'ATENÇÃO: Recarga/Teste vencido! Necessita manutenção imediata.';
+            } else if (status.code === 'WARNING') {
+                statusBannerStyle = 'bg-amber-500 text-slate-950 border-amber-600';
+                statusIcon = 'fa-clock';
+                statusSubtext = 'ALERTA: Vencimento próximo. Programar manutenção preventiva.';
+            }
+
+            const eqEvents = historyRecords
+                .filter(h => h.equipmentId === eq.id || h.equipmentCode.toUpperCase() === eq.code.toUpperCase())
+                .sort((a, b) => b.date.localeCompare(a.date));
+
+            container.innerHTML = `
+                <!-- Cabeçalho do Equipamento -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4 fade-in">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl ${isExt ? 'bg-brand-600 text-white' : 'bg-blue-600 text-white'} flex items-center justify-center text-xl shadow-sm shrink-0">
+                                <i class="fa-solid ${isExt ? 'fa-fire-extinguisher' : 'fa-faucet-drip'}"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">${eq.code}</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">${eq.type}</span>
+                                </div>
+                                <p class="text-sm font-semibold text-slate-700 mt-0.5">${eq.subtype} • <strong>${eq.capacity}</strong></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center gap-2 text-sm text-slate-700">
+                        <i class="fa-solid fa-location-dot text-brand-600"></i>
+                        <span><strong>Localização:</strong> ${eq.location}</span>
+                    </div>
+                </div>
+
+                <!-- Card de Status e Validade com Cor Semântica Forte -->
+                <div class="rounded-2xl p-5 shadow-md border ${statusBannerStyle} space-y-4 fade-in">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid ${statusIcon} text-2xl sm:text-3xl"></i>
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider font-bold opacity-85 block">Status Operacional</span>
+                                <h2 class="text-xl sm:text-2xl font-black tracking-tight">${status.label}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs sm:text-sm font-medium opacity-95">${statusSubtext}</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+                        <div class="bg-black/15 backdrop-blur-xs rounded-xl p-3">
+                            <span class="block text-[10px] uppercase tracking-wider font-bold opacity-85">Vencimento Carga/Teste</span>
+                            <span class="text-base sm:text-lg font-black mt-0.5 block">${formatDateBR(eq.expiryDate)}</span>
+                        </div>
+                        <div class="bg-black/15 backdrop-blur-xs rounded-xl p-3">
+                            <span class="block text-[10px] uppercase tracking-wider font-bold opacity-85">Última Manutenção</span>
+                            <span class="text-sm sm:text-base font-bold mt-0.5 block">${formatDateBR(eq.lastMaintenance)}</span>
+                        </div>
+                        <div class="bg-black/15 backdrop-blur-xs rounded-xl p-3">
+                            <span class="block text-[10px] uppercase tracking-wider font-bold opacity-85">Próx. Checagem Mensal</span>
+                            <span class="text-sm sm:text-base font-bold mt-0.5 block">${formatDateBR(eq.nextCheck)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ação Rápida para Técnico em Campo -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 fade-in">
+                    <div class="text-center sm:text-left">
+                        <h3 class="text-sm font-bold text-slate-900">Realizando inspeção ou troca agora?</h3>
+                        <p class="text-xs text-slate-500">Registre a checagem ou recarga diretamente pelo celular.</p>
+                    </div>
+                    <button onclick="openEventModal('${eq.id}')" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 shrink-0">
+                        <i class="fa-solid fa-clipboard-check"></i>
+                        <span>Registrar Nova Checagem / Manutenção</span>
+                    </button>
+                </div>
+
+                <!-- Observações Técnicas -->
+                ${eq.notes ? `
+                    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 text-xs text-slate-600">
+                        <strong class="text-slate-800 block mb-1"><i class="fa-solid fa-circle-info text-slate-400 mr-1"></i>Observações Cadastrais:</strong>
+                        ${eq.notes}
+                    </div>
+                ` : ''}
+
+                <!-- Linha do Tempo Completa de Manutenções e Checagens Anteriores -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4 fade-in">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-brand-600"></i>
+                            <span>Histórico de Checagens e Manutenções</span>
+                        </h3>
+                        <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">${eqEvents.length}</span>
+                    </div>
+
+                    ${eqEvents.length === 0 ? `
+                        <p class="text-sm text-slate-500 italic py-4 text-center">Nenhum registro anterior encontrado para este equipamento.</p>
+                    ` : `
+                        <div class="relative pl-6 border-l-2 border-slate-200 space-y-4 ml-2">
+                            ${eqEvents.map(ev => {
+                                const style = getEventBadgeStyle(ev.eventType);
+                                const dateChanged = ev.oldExpiryDate && ev.newExpiryDate && ev.oldExpiryDate !== ev.newExpiryDate;
+
+                                return `
+                                    <div class="relative bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                        <span class="absolute -left-[31px] top-4 w-3.5 h-3.5 rounded-full ${style.dot} ring-4 ring-white"></span>
+                                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${style.bg}">
+                                                <i class="fa-solid ${style.icon}"></i>
+                                                ${ev.eventType}
+                                            </span>
+                                            <span class="text-xs font-extrabold text-slate-800">${formatDateBR(ev.date)}</span>
+                                        </div>
+
+                                        <p class="text-xs sm:text-sm text-slate-700 my-2">${ev.notes || '<span class="italic text-slate-400">Sem observações registradas.</span>'}</p>
+
+                                        <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                                            ${renderChecklistPills(ev.checklist)}
+                                        </div>
+
+                                        <div class="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                                            <span><i class="fa-solid fa-user-check mr-1"></i><strong>Técnico:</strong> ${ev.inspector}</span>
+                                            ${dateChanged ? `
+                                                <span class="font-semibold text-blue-700">
+                                                    Validade: ${formatDateBR(ev.oldExpiryDate)} → ${formatDateBR(ev.newExpiryDate)}
+                                                </span>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+
+        function exitQrView() {
+            if (window.location.hash && window.location.hash.startsWith('#equip=')) {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            document.getElementById('qr-scanner-view').classList.add('hidden');
+            document.getElementById('qr-scanner-view').classList.remove('flex');
+            document.getElementById('main-app-wrapper').classList.remove('hidden');
+            renderAll();
+        }
+
+        function checkHashRoute() {
+            const hash = window.location.hash || '';
+            if (hash.startsWith('#equip=')) {
+                const code = hash.replace('#equip=', '');
+                if (code) {
+                    openQrScannerView(code);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // =========================================================================
+        // NOTIFICAÇÕES TOAST
+        // =========================================================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const styles = {
+                success: 'bg-slate-900 text-white border-emerald-500/40',
+                error: 'bg-red-900 text-white border-red-400/40',
+                info: 'bg-slate-800 text-white border-blue-400/40'
+            };
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-circle-exclamation text-red-300',
+                info: 'fa-circle-info text-blue-400'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium fade-in ${styles[type] || styles.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type] || icons.info} text-base"></i>
+                <span class="flex-1">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // =========================================================================
+        // INICIALIZAÇÃO DA APLICAÇÃO
+        // =========================================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-date-label').textContent = formatDateBR(getTodayISO());
+            loadData();
+            renderAll();
+            checkHashRoute();
+        });
+
+        window.addEventListener('hashchange', () => {
+            if (!checkHashRoute()) {
+                exitQrView();
+            }
+        });
+    </script>
+</body>
+</html>
